@@ -1,4 +1,4 @@
-name: Android 内核构建-自定义
+name: Custom Android Kernel Build
 
 permissions:
   contents: write
@@ -7,9 +7,9 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      # ==================== 下拉选项 ====================
+      # ==================== Dropdowns ====================
       kernel_version:
-        description: "内核版本"
+        description: "Kernel version"
         required: true
         type: choice
         options:
@@ -20,7 +20,7 @@ on:
           - "6.12"
         default: "5.10"
       kernelsu_variant:
-        description: "KernelSU 变体"
+        description: "KernelSU variant"
         required: true
         type: choice
         options:
@@ -32,25 +32,25 @@ on:
           - BakaSU
         default: BakaSU
       ksu_mode:
-        description: "KernelSU / SUSFS 模式"
+        description: "KernelSU / SUSFS mode"
         required: true
         type: choice
         options:
-          - 关闭
-          - 禁用SUSFS
-          - 禁用KSU
-        default: 关闭
+          - "Off"
+          - "Disable SUSFS"
+          - "Disable KernelSU"
+        default: "Off"
       use_kpm:
-        description: "KPM 功能（patched 尚不支持）"
+        description: "KPM support (patched mode is not yet supported)"
         required: true
         type: choice
-        default: "disabled (关闭)"
+        default: "Disabled"
         options:
-          - "disabled (关闭)"
-          - "enabled (开启)"
-          - "patched (开启并修补，尚不支持)"
+          - "Disabled"
+          - "Enabled"
+          - "Patched (enable and apply patches, not yet supported)"
       droidspaces:
-        description: "Droidspaces 容器支持 (5.10~6.6: 槽位补丁, 6.12: 开/关)"
+        description: "Droidspaces container support (slot patches for 5.10–6.6, on/off for 6.12)"
         required: false
         type: choice
         options:
@@ -60,68 +60,68 @@ on:
           - "345"
         default: "off"
       artifact_upload_mode:
-        description: "构建产物上传模式"
+        description: "Which build artifacts to upload"
         required: true
         type: choice
         options:
-          - "仅上传 AnyKernel3.zip"
-          - "上传全部"
-        default: "仅上传 AnyKernel3.zip"
+          - "Upload AnyKernel3.zip only"
+          - "Upload all artifacts"
+        default: "Upload AnyKernel3.zip only"
 
-      # ==================== 文本输入 ====================
+      # ==================== Text inputs ====================
       os_patch_level:
-        description: "安全补丁级别 (如 2022-01, lts)"
+        description: "Security patch level (for example, 2022-01 or lts)"
         required: true
         type: string
         default: "2022-01"
       version:
-        description: "自定义版本名 (可选)"
+        description: "Custom version name (optional)"
         required: false
         type: string
       build_time:
-        description: "自定义构建时间 (可选，N或留空=当前UTC)"
+        description: "Custom build time (optional, enter N or leave blank to use the current UTC time)"
         required: false
         type: string
         default: "Sun Dec 01 08:10:00 UTC 2024"
 
-      # ==================== 开关（默认关闭） ====================
+      # ==================== Toggles (off by default) ====================
       use_zram:
-        description: "启用 ZRAM 增强算法"
+        description: "Enable enhanced ZRAM algorithms"
         required: true
         type: boolean
         default: false
       use_bbg:
-        description: "启用 BBG 防格机"
+        description: "Enable BBG protection against factory resets"
         required: true
         type: boolean
         default: false
       use_rekernel:
-        description: "启用 Re-Kernel 驱动"
+        description: "Enable the Re-Kernel driver"
         required: false
         type: boolean
         default: false
       use_nomount:
-        description: "启用 NoMount 挂载元模块"
+        description: "Enable the NoMount mounting metamodule"
         required: false
         type: boolean
         default: false
       use_networking:
-        description: "启用网络增强（BBRv3 / IPSet / Qdisc / CIFS）"
+        description: "Enable networking enhancements (BBRv3 / IPSet / Qdisc / CIFS)"
         required: false
         type: boolean
         default: false
       cve_2026_43499_patch:
-        description: "应用 CVE-2026-43499 rtmutex 修复链"
+        description: "Apply the rtmutex patch series for CVE-2026-43499"
         required: false
         type: boolean
         default: false
       supp_op:
-        description: "启用一加 8E 支持"
+        description: "Enable OnePlus 8E support"
         required: false
         type: boolean
         default: false
       droidspaces_ntsync:
-        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
+        description: "Enable NTSync for Droidspaces containers (requires Droidspaces)"
         required: false
         type: boolean
         default: false
@@ -134,10 +134,10 @@ jobs:
       sub_level: ${{ steps.resolve.outputs.sub_level }}
       kernel_full: ${{ steps.resolve.outputs.kernel_full }}
     steps:
-      - name: 检出版本数据
+      - name: Check out version data
         uses: actions/checkout@v7
 
-      - name: 解析安全补丁级别
+      - name: Find the kernel version for the selected security patch level
         id: resolve
         env:
           KERNEL_VERSION: ${{ inputs.kernel_version }}
@@ -160,13 +160,13 @@ jobs:
           }
           android_version = android_map.get(kernel_version)
           if android_version is None:
-              print(f"::error::未适配的内核版本: {kernel_version}")
+              print(f"::error::Unsupported kernel version: {kernel_version}")
               sys.exit(1)
 
           data_path = Path("data") / android_version / f"{kernel_version}.json"
 
           if not data_path.exists():
-              print(f"::error::未找到版本数据: {data_path}")
+              print(f"::error::Version data file not found: {data_path}")
               sys.exit(1)
 
           with data_path.open("r", encoding="utf-8") as f:
@@ -175,7 +175,7 @@ jobs:
           if os_patch_level == "lts":
               kernel_full = data.get("lts")
               if not kernel_full:
-                  print(f"::error::{android_version} / {kernel_version} 缺少 LTS 版本数据")
+                  print(f"::error::Missing LTS version data for {android_version} / {kernel_version}")
                   sys.exit(1)
               sub_level = "X"
           else:
@@ -184,12 +184,12 @@ jobs:
                   None,
               )
               if matched is None:
-                  print(f"::error::未找到 {android_version} / {kernel_version} / {os_patch_level} 对应的版本数据")
+                  print(f"::error::No version data found for {android_version} / {kernel_version} / {os_patch_level}")
                   sys.exit(1)
               kernel_full = matched.get("kernel", "")
               prefix = f"{kernel_version}."
               if not kernel_full.startswith(prefix):
-                  print(f"::error::版本数据异常: {kernel_full} 不属于 {kernel_version}")
+                  print(f"::error::Invalid version data: {kernel_full} does not match kernel series {kernel_version}")
                   sys.exit(1)
               sub_level = kernel_full.rsplit(".", 1)[-1]
 
@@ -198,7 +198,7 @@ jobs:
               output.write(f"sub_level={sub_level}\n")
               output.write(f"kernel_full={kernel_full}\n")
 
-          print(f"解析结果: {android_version} / {kernel_full}，子版本号: {sub_level}")
+          print(f"Resolved {android_version} / {kernel_full} (kernel sublevel: {sub_level})")
           PY
 
   build-custom-kernel:
@@ -217,17 +217,23 @@ jobs:
       build_time: ${{ inputs.build_time || '' }}
       use_zram: ${{ inputs.use_zram }}
       use_bbg: ${{ inputs.use_bbg }}
-      use_kpm: ${{ inputs.use_kpm }}
+      use_kpm: >-
+        ${{ inputs.use_kpm == 'Enabled' && 'enabled (开启)' ||
+            inputs.use_kpm == 'Patched (enable and apply patches, not yet supported)' && 'patched (开启并修补，尚不支持)' ||
+            'disabled (关闭)' }}
       use_rekernel: ${{ inputs.use_rekernel || false }}
       use_nomount: ${{ inputs.use_nomount || false }}
       use_networking: ${{ inputs.use_networking || false }}
       cve_2026_43499_patch: ${{ inputs.cve_2026_43499_patch }}
       supp_op: ${{ inputs.supp_op || false }}
-      enable_susfs: ${{ inputs.ksu_mode != '禁用SUSFS' && inputs.ksu_mode != '禁用KSU' }}
-      ksu_mode: ${{ inputs.ksu_mode || '关闭' }}
+      enable_susfs: ${{ inputs.ksu_mode != 'Disable SUSFS' && inputs.ksu_mode != 'Disable KernelSU' }}
+      ksu_mode: >-
+        ${{ inputs.ksu_mode == 'Disable SUSFS' && '禁用SUSFS' ||
+            inputs.ksu_mode == 'Disable KernelSU' && '禁用KSU' ||
+            '关闭' }}
       droidspaces: ${{ inputs.droidspaces || 'off' }}
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync || false }}
-      artifact_upload_mode: ${{ inputs.artifact_upload_mode }}
+      artifact_upload_mode: ${{ inputs.artifact_upload_mode == 'Upload all artifacts' && '上传全部' || '仅上传 AnyKernel3.zip' }}
 
   get-ksu-manager:
     uses: ./.github/workflows/get-manager.yml
